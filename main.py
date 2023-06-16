@@ -84,12 +84,9 @@ async def calculate():
     model.load_pretrained(model_name)
     
     query = 'pupuk npk'
-    items = 'PUPUK NPK MUTIARA 16-16-16 ORIGINAL KEMASAN PABRIK 1KG'
+    item = 'PUPUK NPK MUTIARA 16-16-16 ORIGINAL KEMASAN PABRIK 1KG'
 
-    results = []
-
-    for item in items:
-        results.append(model.predict(query, item))
+    results = model.predict(query, item)
     
     results = np.array(results).tolist()
 
