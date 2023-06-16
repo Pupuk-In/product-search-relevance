@@ -2,13 +2,10 @@ import re
 import string
 from typing import Union
 import tensorflow as tf
-import numpy as np
 from transformers import BertTokenizer, TFBertModel
 from sklearn.metrics.pairwise import cosine_similarity
-from fastapi import FastAPI, Request
-from fastapi.responses import JSONResponse
+from fastapi import FastAPI
 from pydantic import BaseModel
-
 
 app = FastAPI()
 
@@ -21,18 +18,14 @@ class Input(BaseModel):
     items: list[Item]
     query: str
   
-class TokenSimilarity:
+class MyModel:
     def load_pretrained(self, from_pretrained:str):
         self.tokenizer = BertTokenizer.from_pretrained(from_pretrained)
         self.model = TFBertModel.from_pretrained(from_pretrained)
         
     def __cleaning(self, text:str):
-        # clear punctuations
         text = text.translate(str.maketrans('', '', string.punctuation))
-
-        # clear multiple spaces
         text = re.sub(r'/s+', ' ', text).strip()
-
         return text
         
     def __process(self, first_token:str, second_token:str):
@@ -46,27 +39,17 @@ class TokenSimilarity:
 
         outputs = self.model(**inputs)
 
-        # get the weights from the last layer as embeddings
-        embeddings = outputs[0] # when used in older transformers version
-        # embeddings = outputs.last_hidden_state # when used in newer one
-
-        # add more dimension then expand tensor
-        # to match embeddings shape by duplicating its values by rows
+        embeddings = outputs[0] 
         mask = tf.expand_dims(attention, -1)
         mask = tf.cast(mask, tf.float32)
         mask = tf.broadcast_to(mask, tf.shape(embeddings))
 
         masked_embeddings = embeddings * mask
         
-        # MEAN POOLING FOR 2ND DIMENSION
-        # first, get sums by 2nd dimension
-        # second, get counts of 2nd dimension
-        # third, calculate the mean, i.e. sums/counts
         summed = tf.reduce_sum(masked_embeddings, axis=1)
         counts = tf.clip_by_value(tf.reduce_sum(mask, axis=1), clip_value_min=1e-9, clip_value_max=float('inf'))
         mean_pooled = summed/counts
         
-        # return mean pooling as numpy array
         return mean_pooled.numpy()
         
     def predict(self, first_token:str, second_token:str,
@@ -83,13 +66,12 @@ class TokenSimilarity:
         if return_as_embeddings:
             return mean_pooled_arr
 
-        # calculate similarity
         similarity = cosine_similarity([mean_pooled_arr[0]], [mean_pooled_arr[1]])
-
+        
         return similarity
 
 model_name ='cahya/bert-base-indonesian-1.5G'
-model = TokenSimilarity()
+model = MyModel()
 model.load_pretrained(model_name)
 
 @app.post("/calculate/", response_model=list[Item])
@@ -106,21 +88,6 @@ async def calculate(input: Input):
         results.append(result)
           
     return results
-    
-# @app.get("/search")
-# async def search_items(search:str):
-#     base_url = "https://pupukin-prod-l6hx3dk4bq-et.a.run.app/api"
-#     endpoint = "/search/items"
-#     url = base_url + endpoint
-
-#     payload = {
-#         "search": search
-#     }
-
-#     response = requests.post(url, json=payload)
-#     return response.json()
-
-
 
 @app.get("/")
 async def index():
