@@ -5,7 +5,7 @@ import numpy as np
 from transformers import BertTokenizer, TFBertModel
 from sklearn.metrics.pairwise import cosine_similarity
 import requests
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 
 app = FastAPI()
@@ -77,17 +77,17 @@ class TokenSimilarity:
 
         return similarity
 
-@app.get("/calculate")
-async def calculate():    
+@app.post("/calculate")
+async def calculate(request: Request):
+    data = await request.json()
+    query = data.get('query')
+    data = data.get('data')
+
     model_name ='cahya/bert-base-indonesian-1.5G'
     model = TokenSimilarity()
     model.load_pretrained(model_name)
-    
-    query = 'pupuk npk'
-    item = 'PUPUK NPK MUTIARA 16-16-16 ORIGINAL KEMASAN PABRIK 1KG'
 
     results = model.predict(query, item)
-    
     results = np.array(results).tolist()
 
     return JSONResponse(content=results)
