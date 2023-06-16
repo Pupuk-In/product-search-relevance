@@ -81,7 +81,7 @@ class TokenSimilarity:
 async def calculate(request: Request):
     data = await request.json()
     query = data.get('query')
-    data = data.get('data')
+    item = data.get('item')
 
     model_name ='cahya/bert-base-indonesian-1.5G'
     model = TokenSimilarity()
