@@ -1,15 +1,26 @@
 import re
 import string
+from typing import Union
 import tensorflow as tf
 import numpy as np
 from transformers import BertTokenizer, TFBertModel
 from sklearn.metrics.pairwise import cosine_similarity
-import requests
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
+from pydantic import BaseModel
+
 
 app = FastAPI()
 
+class Item(BaseModel):
+    id: int
+    name: str
+    relevance: Union[float, None] = None   
+     
+class Input(BaseModel):
+    items: list[Item]
+    query: str
+  
 class TokenSimilarity:
     def load_pretrained(self, from_pretrained:str):
         self.tokenizer = BertTokenizer.from_pretrained(from_pretrained)
@@ -77,20 +88,24 @@ class TokenSimilarity:
 
         return similarity
 
-@app.post("/calculate")
-async def calculate(request: Request):
-    data = await request.json()
-    query = data.get('query')
-    item = data.get('item')
+model_name ='cahya/bert-base-indonesian-1.5G'
+model = TokenSimilarity()
+model.load_pretrained(model_name)
 
-    model_name ='cahya/bert-base-indonesian-1.5G'
-    model = TokenSimilarity()
-    model.load_pretrained(model_name)
-
-    results = model.predict(query, item)
-    results = np.array(results).tolist()
-
-    return JSONResponse(content=results)
+@app.post("/calculate/", response_model=list[Item])
+async def calculate(input: Input):
+    
+    query = input.query
+    items = input.items
+    
+    results = []
+    
+    for item in items:
+        result = Item(id=item.id, name=item.name)
+        result.relevance = model.predict(query, item.name)
+        results.append(result)
+          
+    return results
     
 # @app.get("/search")
 # async def search_items(search:str):
